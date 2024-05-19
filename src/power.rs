@@ -1,0 +1,217 @@
+use defmt::{debug, trace};
+use embassy_stm32::{
+    dac::{Dac, DacCh1, Value},
+    dma::NoDma,
+    gpio::Output,
+    peripherals::{DAC1, PA2, PA3, PA4, PA5},
+    Peripheral,
+};
+use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
+use embassy_time::{Duration, Timer};
+use fixed::types::U16F16;
+use fixed_macro::types::I16F16;
+
+use crate::monitoring::{Temp, Voltage};
+
+static DESIRED_LEVEL: embassy_sync::mutex::Mutex<ThreadModeRawMutex, u8> = Mutex::new(0);
+static GRADUAL_LEVEL: embassy_sync::mutex::Mutex<ThreadModeRawMutex, u8> = Mutex::new(0);
+
+static POKE_POWER_CONTROLLER: embassy_sync::signal::Signal<ThreadModeRawMutex, ()> =
+    embassy_sync::signal::Signal::new();
+
+fn poke_power_controller() {
+    POKE_POWER_CONTROLLER.signal(());
+}
+
+pub async fn blink(blinks: u8) {
+    // TODO: calculate blink level off current level
+    let current_level = *DESIRED_LEVEL.lock().await;
+
+    for _ in 0..blinks {
+        set_level(40).await;
+        embassy_time::Timer::after_millis(100).await;
+        set_level(current_level).await;
+        embassy_time::Timer::after_millis(100).await;
+    }
+}
+
+pub async fn set_level_gradual(level: u8) {
+    let mut gradual_level = GRADUAL_LEVEL.lock().await;
+
+    let needs_poking = *gradual_level == 0;
+
+    *gradual_level = level;
+
+    if needs_poking {
+        poke_power_controller();
+    }
+}
+
+pub async fn set_level(level: u8) {
+    let mut desired_level = DESIRED_LEVEL.lock().await;
+    *desired_level = level;
+
+    set_level_gradual(level).await;
+}
+
+struct PowerPaths<'a> {
+    dac: DacCh1<'a, DAC1>,
+    hdr: Output<'a>,
+    en: Output<'a>,
+}
+
+impl<'a> PowerPaths<'a> {
+    async fn set(&mut self, level: u8) {
+        if level == 0 {
+            debug!("Setting light level to {}", level);
+            self.dac.set(embassy_stm32::dac::Value::Bit8(0));
+            self.dac.disable();
+            self.hdr.set_low();
+            self.en.set_low();
+
+            crate::state::set_on(false).await;
+        } else {
+            if self.en.is_set_low() {
+                self.dac.set(embassy_stm32::dac::Value::Bit8(0));
+                self.dac.enable();
+                self.hdr.set_low();
+                self.en.set_high();
+                Timer::after_millis(8).await;
+
+                crate::state::set_on(true).await;
+                debug!("Bringing up light");
+            }
+
+            let config = &crate::power_curve::POWER_LEVELS[(level - 1) as usize];
+            debug!("hdr: {}, dac: {}", config.hdr, config.dac);
+            self.dac
+                .set(embassy_stm32::dac::Value::Bit12Right(config.dac));
+            self.hdr.set_level(config.hdr.into());
+        }
+    }
+}
+
+const INSTANT_STOP_TEMP: Temp = Temp(I16F16!(60.0));
+const MAX_TEMP: Temp = Temp(I16F16!(50.0));
+const MIN_VOLTS: Voltage = Voltage(I16F16!(3.0));
+const INSTANT_STOP_VOLTS: Voltage = Voltage(I16F16!(3.0));
+
+async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
+    let mut previous_level = 0u8;
+
+    let mut accumulated_over_temp = U16F16::ZERO;
+    let mut accumulated_under_volts = U16F16::ZERO;
+
+    loop {
+        let gradual_level = *GRADUAL_LEVEL.lock().await;
+        let desired_level = *DESIRED_LEVEL.lock().await;
+
+        let delta = if desired_level.abs_diff(gradual_level) > 50 {
+            3
+        } else {
+            1
+        };
+
+        let desired_level = if desired_level < gradual_level {
+            desired_level + delta
+        } else if desired_level > gradual_level {
+            desired_level - delta
+        } else {
+            desired_level
+        };
+        *DESIRED_LEVEL.lock().await = desired_level;
+
+        let mut actual_level = desired_level;
+
+        let volts = *crate::monitoring::VOLTAGE.lock().await;
+
+        if volts < INSTANT_STOP_VOLTS {
+            actual_level = 0;
+        }
+
+        let temp = *crate::monitoring::TEMP.lock().await;
+
+        if temp > INSTANT_STOP_TEMP {
+            actual_level = 0;
+        }
+
+        let temp_diff = temp.0 - MAX_TEMP.0;
+
+        accumulated_over_temp = accumulated_over_temp.saturating_add_signed(temp_diff);
+
+        trace!(
+            "Accumulated over temp: {}",
+            defmt::Display2Format(&accumulated_over_temp)
+        );
+
+        accumulated_under_volts = accumulated_under_volts.saturating_add_signed(if volts < MIN_VOLTS {
+            I16F16!(1.0)
+        } else {
+            I16F16!(-1.0)
+        });
+
+        trace!(
+            "Accumulated under volts: {}",
+            defmt::Display2Format(&accumulated_under_volts)
+        );
+
+        const TICKS_PER_SEC: u64 = 100;
+        let power_decrease = accumulated_under_volts
+            .saturating_add(accumulated_over_temp / U16F16::from_num(64 * TICKS_PER_SEC * 2));
+
+        actual_level = actual_level.saturating_sub(power_decrease.int().to_num());
+
+        if actual_level != previous_level {
+            previous_level = actual_level;
+
+            paths.set(actual_level).await;
+        }
+
+        if actual_level == 0 {
+            return;
+        }
+
+        Timer::after(Duration::from_hz(TICKS_PER_SEC)).await;
+    }
+}
+
+#[embassy_executor::task]
+pub async fn power_task(hdr: PA2, en: PA3, dac: DAC1, dac_out: PA4, pa5: PA5) {
+    let mut hdr = hdr.into_ref();
+    let mut en = en.into_ref();
+    let mut dac = dac.into_ref();
+    let mut dac_out = dac_out.into_ref();
+    let mut pa5 = pa5.into_ref();
+    loop {
+        POKE_POWER_CONTROLLER.wait().await;
+
+        let (mut dac_ch1, mut dac_ch2) = Dac::new(
+            dac.reborrow(),
+            NoDma,
+            NoDma,
+            dac_out.reborrow(),
+            pa5.reborrow(),
+        )
+        .split();
+        dac_ch2.set(Value::Bit8(0));
+        dac_ch1.set(Value::Bit8(0));
+        dac_ch2.set_enable(false);
+        dac_ch1.set_enable(false);
+
+        let paths = PowerPaths {
+            dac: dac_ch1,
+            hdr: Output::new(
+                hdr.reborrow(),
+                embassy_stm32::gpio::Level::Low,
+                embassy_stm32::gpio::Speed::Low,
+            ),
+            en: Output::new(
+                en.reborrow(),
+                embassy_stm32::gpio::Level::Low,
+                embassy_stm32::gpio::Speed::Low,
+            ),
+        };
+
+        handle_on_state(paths).await;
+    }
+}
