@@ -96,7 +96,7 @@ pub async fn monitoring_task(mut bat_level: PA0, adc: ADC1, wd: IWDG) {
     let mut adc = adc.into_ref();
 
     let mut watchdog = IndependentWatchdog::new(wd, 6_000_000);
-    // watchdog.unleash();
+    watchdog.unleash();
 
     let mut smoothers = Smoothers {
         temp: Smoother(I16F16!(20.0)),
@@ -221,4 +221,22 @@ async fn measure_while_off(
 
         Timer::after_secs(4).await;
     }
+}
+
+#[allow(non_snake_case)]
+struct TemperatureSmoother {
+    u: I16F16,
+    std_dev_a: I16F16,
+    std_dev_m: I16F16,
+    A: nalgebra::SMatrix<I16F16, 2, 2>,
+    B: nalgebra::SMatrix<I16F16, 2, 1>,
+    H: nalgebra::SMatrix<I16F16, 1, 2>,
+    Q: nalgebra::SMatrix<I16F16, 2, 2>,
+    R: nalgebra::SMatrix<I16F16, 1, 1>,
+    P: nalgebra::SMatrix<I16F16, 2, 2>,
+    x: nalgebra::SVector<I16F16, 2>,
+}
+
+impl TemperatureSmoother {
+
 }

@@ -15,7 +15,7 @@ impl PowerLevel {
     // output of this level, 0..1
     fn output(&self) -> f32 {
         let (scale, offset) = if self.hdr {
-            (1.0, 1.0 / 4096.0)
+            (1.0, 1.0 / 3413.33)
         } else {
             (1.0 / 4096.0, 0.0)
             // 1 / 3413.33
