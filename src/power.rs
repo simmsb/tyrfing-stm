@@ -200,6 +200,7 @@ pub async fn power_task(hdr: PA2, en: PB5, dac: DAC1, dac_out: PA4, pa5: PA5) {
         dac_ch1.set(Value::Bit8(0));
         dac_ch2.set_enable(false);
         dac_ch1.set_enable(false);
+        dac_ch1.set_output_buffer(false);
 
         let paths = PowerPaths {
             dac: dac_ch1,
