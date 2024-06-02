@@ -14,10 +14,11 @@ struct PowerLevel {
 impl PowerLevel {
     // output of this level, 0..1
     fn output(&self) -> f32 {
+        let hdr_factor = 470.0;
         let (scale, offset) = if self.hdr {
-            (1.0, 1.0 / 3413.33)
+            (1.0, 1.0 / hdr_factor)
         } else {
-            (1.0 / 4096.0, 0.0)
+            (1.0 / hdr_factor, 0.0)
             // 1 / 3413.33
         };
 
@@ -48,6 +49,8 @@ fn main() {
             .iter()
             .min_by(|a, b| f32::total_cmp(&(a.output() - l).abs(), &(b.output() - l).abs()))
             .unwrap();
+
+        println!("cargo:warning=For {l:0.3}: hdr: {hdr}, dac: {dac}");
 
         quote! {
             PowerLevel {

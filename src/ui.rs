@@ -1,4 +1,4 @@
-use embassy_time::{with_timeout, Duration, Instant};
+use maitake::time::{timeout, Duration, Instant};
 
 use embassy_futures::select;
 
@@ -9,7 +9,7 @@ use crate::{
 
 const DEFAULT_LEVEL: u8 = 27;
 
-#[embassy_executor::task]
+// #[embassy_executor::task]
 pub async fn torch_ui_task() {
     let mut saved_level = DEFAULT_LEVEL;
 
@@ -17,7 +17,7 @@ pub async fn torch_ui_task() {
         let unlocked = crate::state::is_unlocked().await;
 
         if unlocked {
-            let evt = with_timeout(
+            let evt = timeout(
                 Duration::from_secs(60 * 3),
                 BUTTON_EVENTS.wait(),
             )
@@ -54,7 +54,7 @@ pub async fn torch_ui_task() {
             let evt = select::select(BUTTON_EVENTS.wait(), LOCKOUT_BUTTON_STATES.wait()).await;
             match evt {
                 select::Either::Second(ButtonState::Press) => {
-                    crate::power::set_level(40).await;
+                    crate::power::set_level(30).await;
                 }
                 select::Either::Second(ButtonState::Depress) => {
                     crate::power::set_level(0).await;
@@ -80,7 +80,8 @@ async fn on_strobe() {
     let strobe = async {
         let mut on = true;
         loop {
-            embassy_time::Timer::after(period.get()).await;
+
+            maitake::time::sleep(period.get().into()).await;
             crate::power::set_level(if on { level.get() } else { 1 });
             crate::power::poke_power_controller();
             on = !on;
@@ -101,7 +102,7 @@ async fn on_strobe() {
                         -1
                     };
                     loop {
-                        if with_timeout(Some(Duration::from_millis(200)), BUTTON_EVENTS.wait())
+                        if timeout(Some(Duration::from_millis(200)), BUTTON_EVENTS.wait())
                             .await
                             .is_err()
                         {
@@ -115,7 +116,7 @@ async fn on_strobe() {
                     }
                 }
                 crate::click::ButtonEvent::Hold2 => loop {
-                    if with_timeout(Some(Duration::from_millis(100)), BUTTON_EVENTS.wait())
+                    if timeout(Some(Duration::from_millis(100)), BUTTON_EVENTS.wait())
                         .await
                         .is_err()
                     {
@@ -125,7 +126,7 @@ async fn on_strobe() {
                     }
                 },
                 crate::click::ButtonEvent::Hold3 => loop {
-                    if with_timeout(Some(Duration::from_millis(100)), BUTTON_EVENTS.wait())
+                    if timeout(Some(Duration::from_millis(100)), BUTTON_EVENTS.wait())
                         .await
                         .is_err()
                     {
@@ -137,7 +138,7 @@ async fn on_strobe() {
                     }
                 },
                 crate::click::ButtonEvent::Hold4 => loop {
-                    if with_timeout(Some(Duration::from_millis(100)), BUTTON_EVENTS.wait())
+                    if timeout(Some(Duration::from_millis(100)), BUTTON_EVENTS.wait())
                         .await
                         .is_err()
                     {
@@ -167,7 +168,7 @@ async fn on_fadeout() {
 
     let fade = async {
         loop {
-            embassy_time::Timer::after_millis(100).await;
+            maitake::time::sleep(core::time::Duration::from_millis(100)).await;
 
             let Some(time_left) = expiry.get().checked_duration_since(Instant::now()) else {
                 break;
@@ -176,10 +177,10 @@ async fn on_fadeout() {
             let brightness = if time_left > Duration::from_secs(60 * 4) {
                 level.get()
             } else {
-                let remaining = fixed::types::U64F0::from_num(time_left.as_ticks())
+                let remaining = fixed::types::U64F0::from_num(time_left.as_millis())
                     .inv_lerp::<fixed::types::extra::U64>(
                         0u32.into(),
-                        Duration::from_secs(60 * 4).as_ticks().into(),
+                        (Duration::from_secs(60 * 4).as_millis() as u32).into(),
                     )
                     .lerp(0u64.into(), 255u64.into())
                     .saturating_to_num::<u8>();
@@ -204,7 +205,7 @@ async fn on_fadeout() {
                         -1
                     };
                     loop {
-                        if with_timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
+                        if timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
                             .await
                             .is_err()
                         {
@@ -218,7 +219,7 @@ async fn on_fadeout() {
                     }
                 }
                 crate::click::ButtonEvent::Hold2 => loop {
-                    if with_timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
+                    if timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
                         .await
                         .is_err()
                     {
@@ -228,7 +229,7 @@ async fn on_fadeout() {
                     }
                 },
                 crate::click::ButtonEvent::Hold3 => loop {
-                    if with_timeout(Duration::from_millis(500), BUTTON_EVENTS.wait())
+                    if timeout(Duration::from_millis(500), BUTTON_EVENTS.wait())
                         .await
                         .is_err()
                     {
@@ -277,7 +278,7 @@ async fn on_ramping(level: u8) -> u8 {
                     -1
                 };
                 loop {
-                    if with_timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
+                    if timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
                         .await
                         .is_err()
                     {
@@ -292,7 +293,7 @@ async fn on_ramping(level: u8) -> u8 {
                 }
             }
             crate::click::ButtonEvent::Hold2 => loop {
-                if with_timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
+                if timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
                     .await
                     .is_err()
                 {

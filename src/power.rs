@@ -1,13 +1,13 @@
-use defmt::{debug, trace};
+use defmt::{debug, info, trace};
 use embassy_stm32::{
     dac::{Dac, DacCh1, Value},
     dma::NoDma,
     gpio::Output,
-    peripherals::{DAC1, PA2, PA3, PA4, PA5},
+    peripherals::{DAC1, PA2, PB5, PA4, PA5},
     Peripheral,
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
-use embassy_time::{Duration, Timer};
+use embassy_time::Duration;
 use fixed::types::U16F16;
 use fixed_macro::types::I16F16;
 
@@ -28,10 +28,10 @@ pub async fn blink(blinks: u8) {
     let current_level = *DESIRED_LEVEL.lock().await;
 
     for _ in 0..blinks {
-        set_level(40).await;
-        embassy_time::Timer::after_millis(100).await;
+        set_level(30).await;
+        maitake::time::sleep(core::time::Duration::from_millis(100)).await;
         set_level(current_level).await;
-        embassy_time::Timer::after_millis(100).await;
+        maitake::time::sleep(core::time::Duration::from_millis(100)).await;
     }
 }
 
@@ -76,9 +76,10 @@ impl<'a> PowerPaths<'a> {
                 self.dac.enable();
                 self.hdr.set_low();
                 self.en.set_high();
-                Timer::after_millis(8).await;
+                maitake::time::sleep(core::time::Duration::from_millis(8)).await;
 
                 crate::state::set_on(true).await;
+                crate::monitoring::poke_measuring();
                 debug!("Bringing up light");
             }
 
@@ -167,16 +168,16 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
             paths.set(actual_level).await;
         }
 
-        if actual_level == 0 {
+        if actual_level == 0 && desired_level == 0 {
             return;
         }
 
-        Timer::after(Duration::from_hz(TICKS_PER_SEC)).await;
+        maitake::time::sleep(Duration::from_hz(TICKS_PER_SEC).into()).await;
     }
 }
 
-#[embassy_executor::task]
-pub async fn power_task(hdr: PA2, en: PA3, dac: DAC1, dac_out: PA4, pa5: PA5) {
+// #[embassy_executor::task]
+pub async fn power_task(hdr: PA2, en: PB5, dac: DAC1, dac_out: PA4, pa5: PA5) {
     let mut hdr = hdr.into_ref();
     let mut en = en.into_ref();
     let mut dac = dac.into_ref();
@@ -184,6 +185,8 @@ pub async fn power_task(hdr: PA2, en: PA3, dac: DAC1, dac_out: PA4, pa5: PA5) {
     let mut pa5 = pa5.into_ref();
     loop {
         POKE_POWER_CONTROLLER.wait().await;
+
+        info!("Power task coming online");
 
         let (mut dac_ch1, mut dac_ch2) = Dac::new(
             dac.reborrow(),

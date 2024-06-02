@@ -5,9 +5,15 @@ use embassy_stm32::wdg::IndependentWatchdog;
 use embassy_stm32::{adc, bind_interrupts, Peripheral, PeripheralRef};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 
-use embassy_time::Timer;
 use fixed::types::I16F16;
 use fixed_macro::types::I16F16;
+
+static POKE_MEASURING: embassy_sync::signal::Signal<ThreadModeRawMutex, ()> =
+    embassy_sync::signal::Signal::new();
+
+pub fn poke_measuring() {
+    POKE_MEASURING.signal(());
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Temp(pub I16F16);
@@ -91,12 +97,12 @@ struct Smoothers {
     voltage: Smoother,
 }
 
-#[embassy_executor::task]
+// #[embassy_executor::task]
 pub async fn monitoring_task(mut bat_level: PA0, adc: ADC1, wd: IWDG) {
     let mut adc = adc.into_ref();
 
     let mut watchdog = IndependentWatchdog::new(wd, 6_000_000);
-    watchdog.unleash();
+    // watchdog.unleash();
 
     let mut smoothers = Smoothers {
         temp: Smoother(I16F16!(20.0)),
@@ -188,7 +194,7 @@ async fn measure_while_on(
             return;
         }
 
-        Timer::after_millis(500).await;
+        maitake::time::sleep(core::time::Duration::from_millis(250)).await;
     }
 }
 
@@ -200,43 +206,45 @@ async fn measure_while_off(
     smoothers: &mut Smoothers,
 ) {
     loop {
-        let mut adc = Adc::new(p.reborrow(), Irqs);
-        adc.set_sample_time(SampleTime::CYCLES160_5);
+        // this scope is important, we must drop the adc before we sleep
+        {
+            let mut adc = Adc::new(p.reborrow(), Irqs);
+            adc.set_sample_time(SampleTime::CYCLES160_5);
 
-        let mut tempsense = adc.enable_temperature();
+            let mut tempsense = adc.enable_temperature();
 
-        measure_and_update(
-            watchdog,
-            bat_level,
-            &mut tempsense,
-            &mut adc,
-            factors,
-            smoothers,
-        )
-        .await;
+            measure_and_update(
+                watchdog,
+                bat_level,
+                &mut tempsense,
+                &mut adc,
+                factors,
+                smoothers,
+            )
+            .await;
 
-        if crate::state::is_on().await {
-            return;
+            if crate::state::is_on().await {
+                return;
+            }
         }
 
-        Timer::after_secs(4).await;
+        let _ =
+            maitake::time::timeout(core::time::Duration::from_secs(4), POKE_MEASURING.wait()).await;
     }
 }
 
-#[allow(non_snake_case)]
-struct TemperatureSmoother {
-    u: I16F16,
-    std_dev_a: I16F16,
-    std_dev_m: I16F16,
-    A: nalgebra::SMatrix<I16F16, 2, 2>,
-    B: nalgebra::SMatrix<I16F16, 2, 1>,
-    H: nalgebra::SMatrix<I16F16, 1, 2>,
-    Q: nalgebra::SMatrix<I16F16, 2, 2>,
-    R: nalgebra::SMatrix<I16F16, 1, 1>,
-    P: nalgebra::SMatrix<I16F16, 2, 2>,
-    x: nalgebra::SVector<I16F16, 2>,
-}
+// #[allow(non_snake_case)]
+// struct TemperatureSmoother {
+//     u: I16F16,
+//     std_dev_a: I16F16,
+//     std_dev_m: I16F16,
+//     A: nalgebra::SMatrix<I16F16, 2, 2>,
+//     B: nalgebra::SMatrix<I16F16, 2, 1>,
+//     H: nalgebra::SMatrix<I16F16, 1, 2>,
+//     Q: nalgebra::SMatrix<I16F16, 2, 2>,
+//     R: nalgebra::SMatrix<I16F16, 1, 1>,
+//     P: nalgebra::SMatrix<I16F16, 2, 2>,
+//     x: nalgebra::SVector<I16F16, 2>,
+// }
 
-impl TemperatureSmoother {
-
-}
+// impl TemperatureSmoother {}

@@ -1,4 +1,5 @@
 use cichlid::ColorRGB;
+use defmt::debug;
 use embassy_stm32::{
     gpio::{Flex, OutputType, Pull},
     peripherals::{PA6, PA7, PB0, TIM3},
@@ -10,7 +11,7 @@ use embassy_stm32::{
     },
     Peripheral as _,
 };
-use fixed::types::{I16F16, U32F32};
+use fixed::types::I16F16;
 use fixed_macro::types::I16F16;
 
 use crate::monitoring::Voltage;
@@ -47,15 +48,11 @@ impl<'a> AuxPwm<'a> {
         let max_duty = self.pwm.get_max_duty();
 
         let calc_duty = |v: u8| {
-            let r = fixed::types::U8F0::inv_lerp::<fixed::types::extra::U8>(
-                v.into(),
-                0.into(),
-                255.into(),
-            );
+            let d = (v as u32 * max_duty) / 255;
 
-            U32F32::lerp(r.into(), U32F32::ZERO, max_duty.into())
-                .int()
-                .to_num()
+            debug!("colour: {}, max_duty: {}, duty: {}", v, max_duty, d);
+
+            d
         };
 
         for (c, v) in [
@@ -95,36 +92,12 @@ async fn transition_to_pwm<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB, target: C
         c.blend(target, i);
         leds.set(c);
 
-        embassy_time::Timer::after_millis(16).await;
+        maitake::time::sleep(core::time::Duration::from_millis(16)).await;
     }
 }
 
 fn hue_to_rgb(hue: u8) -> ColorRGB {
-    let hue = cichlid::math::scale_u8(hue, 191);
-
-    const HSV_SECTION_4: u8 = 0x40;
-
-    let section = hue / HSV_SECTION_4;
-    let offset = hue % HSV_SECTION_4;
-
-    let brightness_floor = 0;
-
-    let ramp_up = offset;
-    let ramp_down = HSV_SECTION_4 - offset;
-
-    let amplitude = 191_u16;
-
-    let ramp_up_amp_adj = ((ramp_up as u16 * amplitude) / (256 / 4)) as u8;
-    let ramp_down_amp_adj = ((ramp_down as u16 * amplitude) / (256 / 4)) as u8;
-
-    let ramp_up = ramp_up.saturating_add(ramp_up_amp_adj);
-    let ramp_down = ramp_down.saturating_add(ramp_down_amp_adj);
-
-    match section {
-        0 => ColorRGB::new(ramp_down, ramp_up, brightness_floor),
-        1 => ColorRGB::new(brightness_floor, ramp_down, ramp_up),
-        _ => ColorRGB::new(ramp_up, brightness_floor, ramp_down),
-    }
+    cichlid::HSV::new(hue, 255, 255).to_rgb_rainbow()
 }
 
 async fn rainbow_aux<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB) -> ColorRGB {
@@ -144,7 +117,7 @@ async fn rainbow_aux<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB) -> ColorRGB {
 
         h = h.wrapping_add(1);
 
-        embassy_time::Timer::after_millis(16).await;
+        maitake::time::sleep(core::time::Duration::from_millis(16)).await;
     }
 }
 
@@ -202,7 +175,7 @@ async fn voltage_high_aux<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB) -> ColorRG
 
         leds.set(rgb);
 
-        embassy_time::Timer::after_millis(64).await;
+        maitake::time::sleep(core::time::Duration::from_millis(64)).await;
     }
 }
 
@@ -225,11 +198,11 @@ async fn voltage_low_aux<'a>(leds: &mut AuxLow<'a>) -> ColorRGB {
             return rgb.to_colorrgb();
         }
 
-        embassy_time::Timer::after_secs(1).await;
+        maitake::time::sleep(core::time::Duration::from_secs(4)).await;
     }
 }
 
-#[embassy_executor::task]
+// #[embassy_executor::task]
 pub async fn aux_task(timer: TIM3, r: PA6, g: PA7, b: PB0) {
     let mut timer = timer.into_ref();
     let mut r = r.into_ref();
@@ -245,7 +218,7 @@ pub async fn aux_task(timer: TIM3, r: PA6, g: PA7, b: PB0) {
                 Some(PwmPin::new_ch2(g.reborrow(), OutputType::PushPull)),
                 Some(PwmPin::new_ch3(b.reborrow(), OutputType::PushPull)),
                 None,
-                Hertz::khz(20),
+                Hertz::khz(5),
                 CountingMode::EdgeAlignedUp,
             );
             let mut aux = AuxPwm { pwm };
