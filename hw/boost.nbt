@@ -1,0 +1,156 @@
+# boost converter calculations
+
+
+fn ripple_current(max_output_current: Current, v_out: Voltage, v_in: Voltage) -> Current =
+  0.3 * max_output_current * (v_out / v_in)
+
+fn ideal_inductance(v_out: Voltage, v_in: Voltage, frequency: Frequency, ripple_current: Current) -> Inductance =
+  (v_in * (v_out - v_in)) / (v_out * frequency * ripple_current)
+
+
+let v_bat_peak = 4.2V
+let v_bat_nom = 3.7V
+let v_bat_min = 3.3V
+
+# 519a: datasheet says 3.2v @ 2.4A
+#       can be pushed to 3.5v @ 8A
+let v_led_min = 2.19V
+let v_led_max = 3.16V
+let num_leds = 4  # in series
+
+#
+# let v_led_min = 4.5V
+# let v_led_max = 8V
+# let num_leds = 1
+
+let v_out_peak = v_led_max * num_leds
+let v_out_min = v_led_min * num_leds
+let v_out = v_out_peak
+let i_out_peak = 3.2A
+let peak_current = i_out_peak
+
+print("Peak current: {peak_current}")
+
+let switching_frequency = 600kHz
+
+let peak_ripple_current = ripple_current(peak_current, v_out, v_bat_min)
+let low_ripple_current = ripple_current(peak_current, v_out, v_bat_peak)
+
+print("Peak    ripple: {peak_ripple_current}")
+print("Low     ripple: {low_ripple_current}")
+
+
+let peak_ideal_inductance = ideal_inductance(v_out, v_bat_peak, switching_frequency, peak_ripple_current)
+let low_ideal_inductance = ideal_inductance(v_out, v_bat_min, switching_frequency, low_ripple_current)
+
+print("Peak    inductance: {peak_ideal_inductance -> microhenries}")
+print("Low     inductance: {low_ideal_inductance -> microhenries}")
+
+print()
+print("==== resistor values ====")
+
+fn derive_pot_top(bot: ElectricResistance, vin_max: Voltage, vout_max: Voltage) -> ElectricResistance =
+  bot * (vin_max / vout_max - 1)
+
+fn derive_pot_bot(top: ElectricResistance, vin_max: Voltage, vout_max: Voltage) -> ElectricResistance =
+  top / (vin_max / vout_max - 1)
+
+let uvlo_v_in_on = 2.35V
+let uvlo_v_in_off = 2.25V
+let uvlo_v_en_on = 1.23V
+let uvlo_v_in_hys = uvlo_v_in_on - uvlo_v_in_off
+let uvlo_r_top = uvlo_v_in_hys / 5 microampere -> ohms
+let uvlo_r_bot = derive_pot_bot(uvlo_r_top, uvlo_v_in_on - uvlo_v_in_hys, uvlo_v_en_on) -> ohms
+
+print("R_UVLO_TOP: {uvlo_r_top}")
+print("R_UVLO_BOTTOM: {uvlo_r_bot}")
+
+let vcc = 2.5V
+let opamp_v_min = 70uV
+let opamp_v_max = vcc - opamp_v_min
+let opamp_v_input_offset_max = 15e-6 V
+
+let fb_r_a = 750kiloohm
+
+struct ThreeWayDivider {
+  r_a: ElectricResistance,
+  r_b: ElectricResistance,
+  r_c: ElectricResistance,
+}
+
+fn calc_fb_resistors(
+  uvlo_v_in_off: Voltage,
+  opamp_v_min: Voltage,
+  opamp_v_max: Voltage,
+  v_out_max: Voltage,
+  v_out_min: Voltage) -> ThreeWayDivider =
+  let alpha = (minimum(uvlo_v_in_off, opamp_v_max) - opamp_v_min) / (v_out_max - v_out_min) of
+  let r_c = fb_r_a * alpha of
+  let r_b = 1V / (((v_out_max - 1V) / fb_r_a) + ((opamp_v_min - 1V) / r_c)) of
+  ThreeWayDivider {
+    r_a: fb_r_a,
+    r_b: r_b,
+    r_c: r_c
+  }
+
+
+let fb_resistors = calc_fb_resistors(
+  uvlo_v_in_off,
+  opamp_v_min,
+  opamp_v_max,
+  v_out_peak,
+  v_out_min) 
+
+print("R_FB_A: {fb_resistors.r_a}")
+print("R_FB_B: {fb_resistors.r_b}")
+print("R_FB_C: {fb_resistors.r_c}")
+# let desired_max_current = 3.5A
+#
+ # actually just the resistance of the FET at 2.5v V_gs
+let sense_r_main = 10 milliohm
+let vref_max = peak_current * sense_r_main -> volts
+
+let dac_r_bot = 3.3 kiloohm
+let dac_r_top = derive_pot_top(dac_r_bot, vcc, vref_max) -> kiloohm
+
+print("DAC_V_MAX: {vref_max}")
+
+print("R_DAC_TOP: {dac_r_top}")
+print("R_DAC_BOT: {dac_r_bot}")
+
+let dac_bits = 12 # stm32
+let dac_resolution = 2 ** dac_bits
+
+let main_i_out_min = peak_current / dac_resolution -> milliampere
+let hdr_i_out_min = main_i_out_min / dac_resolution -> microampere
+let hdr_i_out_max = (10 * main_i_out_min)
+# let hdr_i_out_max = (main_i_out_min)
+
+let sense_r_hdr_ideal = vref_max / hdr_i_out_max -> ohms
+let sense_r_hdr = 4.7 ohms
+
+print("R_SENSE_MAIN: {sense_r_main}")
+print("R_SENSE_HDR: {sense_r_hdr_ideal}")
+
+let bat_v_peak = 4.2V
+let bat_v_min = 3.0V
+
+let bat_r_bot = 3 megaohms
+let bat_v_measured = vcc - 0.1V
+let bat_v_scale_factor = bat_v_measured / bat_v_peak
+let bat_r_top = derive_pot_top(bat_r_bot, bat_v_peak, bat_v_measured)
+
+print("BATTERY EXPECTED PEAK: {bat_v_peak}")
+print("BATTERY MEASURED PEAK : {bat_v_measured}")
+print("R_BAT_TOP: {bat_r_top}")
+print("R_BAT_BOT: {bat_r_bot}")
+
+print()
+print("Current range HDR: {hdr_i_out_min} -> {hdr_i_out_max}")
+print("Current range MAIN: {main_i_out_min} -> {peak_current}")
+let main_scale = sense_r_hdr / sense_r_main
+print("Main/HDR factor: {main_scale}")
+
+let input_offset_check = (vref_max / dac_resolution) / opamp_v_input_offset_max
+print("input offset: {input_offset_check}")
+# assert(input_offset_check > 1)
