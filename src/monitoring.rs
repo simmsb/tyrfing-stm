@@ -189,7 +189,7 @@ async fn measure_while_on(
             &mut adc,
             factors,
             smoothers,
-            I16F16!(0.25)
+            I16F16!(0.25),
         )
         .await;
 
@@ -223,7 +223,7 @@ async fn measure_while_off(
                 &mut adc,
                 factors,
                 smoothers,
-                I16F16!(4.0)
+                I16F16!(4.0),
             )
             .await;
 

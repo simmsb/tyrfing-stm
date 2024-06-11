@@ -122,23 +122,16 @@ async fn rainbow_aux<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB) -> ColorRGB {
 }
 
 fn volts_to_rgb(volts: Voltage) -> ColorRGB {
-    let max = Voltage(I16F16!(4.2));
-    let min = Voltage(I16F16!(3.4));
-
     // red
     let min_hue = 0u8;
     // magenta
     let max_hue = 212u8;
 
-    let hue = if volts < min {
-        min_hue
-    } else if volts > max {
-        max_hue
-    } else {
-        fixed::types::I16F16::inv_lerp::<fixed::types::extra::U16>(volts.0, min.0, max.0)
-            .lerp(I16F16::from_num(min_hue), I16F16::from_num(max_hue))
-            .to_num()
-    };
+    let level = crate::battery_level::voltage_to_level(volts.0);
+
+    let hue = level
+        .lerp(I16F16::from_num(min_hue), I16F16::from_num(max_hue))
+        .to_num();
 
     hue_to_rgb(hue)
 }

@@ -1,5 +1,4 @@
 #![feature(type_alias_impl_trait)]
-
 #![no_std]
 #![no_main]
 
@@ -8,12 +7,13 @@ use embassy_stm32::rtc::{Rtc, RtcConfig};
 use portable_atomic::AtomicUsize;
 use static_cell::{make_static, StaticCell};
 // use static_cell::StaticCell;
-#[cfg(feature = "debug")]
-use {defmt_rtt as _, panic_probe as _};
 #[cfg(not(feature = "debug"))]
 use panic_reset as _;
+#[cfg(feature = "debug")]
+use {defmt_rtt as _, panic_probe as _};
 
 mod aux;
+mod battery_level;
 mod click;
 mod monitoring;
 mod power;
@@ -45,7 +45,6 @@ defmt::timestamp! {"{}", CNT.fetch_add(1, portable_atomic::Ordering::Relaxed) }
 //   |   ________________________|_
 //    \_/__________________________/
 
-
 #[cfg(feature = "use_maitake_executor")]
 mod maitake_stuff {
     use core::future::Future;
@@ -59,13 +58,17 @@ mod maitake_stuff {
             core::ptr::NonNull::from(task)
         }
 
-        fn from_raw(mut ptr: core::ptr::NonNull<maitake::task::Task<S, F, Self>>) -> Self::StoredTask {
+        fn from_raw(
+            mut ptr: core::ptr::NonNull<maitake::task::Task<S, F, Self>>,
+        ) -> Self::StoredTask {
             unsafe { ptr.as_mut() }
         }
     }
 
     impl StaticStorage {
-        pub fn allocate<S: maitake::scheduler::Schedule + 'static, F: Future + 'static>(fut: F) -> maitake::task::Task<S, F, Self> {
+        pub fn allocate<S: maitake::scheduler::Schedule + 'static, F: Future + 'static>(
+            fut: F,
+        ) -> maitake::task::Task<S, F, Self> {
             maitake::task::Task::new(fut)
         }
     }
@@ -76,13 +79,13 @@ mod maitake_stuff {
     impl<T: Future> Future for SurelySend<T> {
         type Output = <T as Future>::Output;
 
-        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> core::task::Poll<Self::Output> {
-            unsafe {
-                T::poll(core::mem::transmute(self), cx)
-            }
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            unsafe { T::poll(core::mem::transmute(self), cx) }
         }
     }
-
 }
 
 #[cfg(feature = "use_maitake_executor")]
@@ -97,8 +100,7 @@ fn main() -> ! {
             crate::executor::scheduler()
                 .build_task()
                 .spawn_allocated::<StaticStorage, _>(task)
-        }
-        };
+        }};
     }
 
     info!("Hello world");

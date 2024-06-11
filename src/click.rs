@@ -1,6 +1,8 @@
 use defmt::info;
 use embassy_stm32::{
-    exti::ExtiInput, gpio::Output, peripherals::{EXTI8, PA8, PC15}
+    exti::ExtiInput,
+    gpio::Output,
+    peripherals::{EXTI8, PA8, PC15},
 };
 #[derive(PartialEq)]
 pub enum ButtonEvent {
@@ -81,7 +83,11 @@ pub enum EventGenState {
 // #[embassy_executor::task]
 pub async fn debouncer_task(t: PA8, ch: EXTI8, led: PC15) {
     let mut t = ExtiInput::new(t, ch, embassy_stm32::gpio::Pull::Up);
-    let mut led = Output::new(led, embassy_stm32::gpio::Level::High, embassy_stm32::gpio::Speed::Low);
+    let mut led = Output::new(
+        led,
+        embassy_stm32::gpio::Level::High,
+        embassy_stm32::gpio::Speed::Low,
+    );
 
     loop {
         led.set_high();
@@ -136,15 +142,19 @@ pub async fn event_generator_task() {
     loop {
         let (wait_until, expecting) = match state {
             EventGenState::FirstClick => (None, ButtonState::Press),
-            EventGenState::ForHigh { .. } => (Some(core::time::Duration::from_millis(300)), ButtonState::Press),
-            EventGenState::ForLow { .. } => {
-                (Some(core::time::Duration::from_millis(300)), ButtonState::Depress)
-            }
+            EventGenState::ForHigh { .. } => (
+                Some(core::time::Duration::from_millis(300)),
+                ButtonState::Press,
+            ),
+            EventGenState::ForLow { .. } => (
+                Some(core::time::Duration::from_millis(300)),
+                ButtonState::Depress,
+            ),
             EventGenState::HoldFinish => (None, ButtonState::Depress),
         };
 
         let r = if let Some(timeout) = wait_until {
-            maitake::time::timeout(timeout,  BUTTON_STATES.wait()).await
+            maitake::time::timeout(timeout, BUTTON_STATES.wait()).await
         } else {
             Ok(BUTTON_STATES.wait().await)
         };

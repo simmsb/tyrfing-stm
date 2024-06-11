@@ -3,7 +3,7 @@ use embassy_stm32::{
     dac::{Dac, DacCh1, Value},
     dma::NoDma,
     gpio::Output,
-    peripherals::{DAC1, PA2, PB5, PA4, PA5},
+    peripherals::{DAC1, PA2, PA4, PA5, PB5},
     Peripheral,
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
@@ -142,11 +142,12 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
             defmt::Display2Format(&accumulated_over_temp)
         );
 
-        accumulated_under_volts = accumulated_under_volts.saturating_add_signed(if volts < MIN_VOLTS {
-            I16F16!(1.0)
-        } else {
-            I16F16!(-1.0)
-        });
+        accumulated_under_volts =
+            accumulated_under_volts.saturating_add_signed(if volts < MIN_VOLTS {
+                I16F16!(1.0)
+            } else {
+                I16F16!(-1.0)
+            });
 
         trace!(
             "Accumulated under volts: {}",

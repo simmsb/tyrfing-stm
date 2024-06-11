@@ -11,7 +11,6 @@ pub async fn set_on(on: bool) {
     *ON.lock().await = on;
 }
 
-
 static UNLOCKED: Mutex<ThreadModeRawMutex, bool> = Mutex::new(false);
 
 pub async fn is_unlocked() -> bool {
@@ -21,7 +20,6 @@ pub async fn is_unlocked() -> bool {
 pub async fn set_unlocked(unlocked: bool) {
     *UNLOCKED.lock().await = unlocked;
 }
-
 
 pub fn emergency_stop() {
     let en_pin = unsafe { embassy_stm32::peripherals::PA3::steal() };
