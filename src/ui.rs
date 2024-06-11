@@ -40,6 +40,10 @@ pub async fn torch_ui_task() {
                 ButtonEvent::Hold3 => {
                     on_strobe().await;
                 }
+                #[cfg(feature = "mode_croak")]
+                ButtonEvent::Hold4 => {
+                    on_croak().await;
+                }
                 ButtonEvent::Click4 => {
                     blink(1).await;
                     crate::state::set_unlocked(false).await;
@@ -235,6 +239,78 @@ async fn on_fadeout() {
     };
 
     embassy_futures::select::select(fade, control).await;
+
+    crate::power::set_level_gradual(0).await;
+    crate::state::set_on(false).await;
+}
+
+#[cfg(feature = "mode_croak")]
+async fn on_croak() {
+    use core::cell::Cell;
+
+    crate::state::set_on(true).await;
+
+    let level = Cell::new(DEFAULT_LEVEL);
+
+    let croaker = async {
+        loop {
+            for x in small_morse::encode("croak") {
+                crate::power::set_level(if x.state == small_morse::State::On {
+                    level.get()
+                } else {
+                    1
+                })
+                .await;
+
+                maitake::time::sleep(core::time::Duration::from_millis(x.duration as u64 * 300))
+                    .await;
+            }
+        }
+    };
+
+    let control = async {
+        let mut last_hold_release = Instant::now();
+        loop {
+            match BUTTON_EVENTS.wait().await {
+                crate::click::ButtonEvent::Click1 => {
+                    return;
+                }
+                crate::click::ButtonEvent::Hold1 => {
+                    let direction = if last_hold_release.elapsed() > Duration::from_millis(500) {
+                        1
+                    } else {
+                        -1
+                    };
+                    loop {
+                        if timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
+                            .await
+                            .is_err()
+                        {
+                            level.set(level.get().saturating_add_signed(direction));
+                        } else {
+                            break;
+                        }
+                    }
+                    if direction == 1 {
+                        last_hold_release = Instant::now();
+                    }
+                }
+                crate::click::ButtonEvent::Hold2 => loop {
+                    if timeout(Duration::from_millis(16), BUTTON_EVENTS.wait())
+                        .await
+                        .is_err()
+                    {
+                        level.set(level.get().saturating_sub(1));
+                    } else {
+                        break;
+                    }
+                },
+                _ => {}
+            }
+        }
+    };
+
+    embassy_futures::select::select(croaker, control).await;
 
     crate::power::set_level_gradual(0).await;
     crate::state::set_on(false).await;

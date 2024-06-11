@@ -1019,6 +1019,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "small_morse"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be47da2709ca6c5a95cbaea1275b139930c1b76c372957015732b95f79c4fdfa"
+
+[[package]]
 name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1214,6 +1220,7 @@ dependencies = [
  "portable-atomic",
  "proc-macro2",
  "quote",
+ "small_morse",
  "static_cell",
 ]
 
