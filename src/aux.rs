@@ -169,7 +169,7 @@ async fn voltage_high_aux<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB) -> ColorRG
         let volts = *crate::monitoring::VOLTAGE.lock().await;
         let rgb = volts_to_rgb(volts);
 
-        if crate::state::is_on().await {
+        if crate::state::is_on().await || !crate::state::is_unlocked().await {
             return rgb;
         }
 

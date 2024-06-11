@@ -93,7 +93,7 @@ impl Smoother {
 }
 
 struct Smoothers {
-    temp: Smoother,
+    temp: TemperatureSmoother,
     voltage: Smoother,
 }
 
@@ -102,10 +102,10 @@ pub async fn monitoring_task(mut bat_level: PA0, adc: ADC1, wd: IWDG) {
     let mut adc = adc.into_ref();
 
     let mut watchdog = IndependentWatchdog::new(wd, 6_000_000);
-    // watchdog.unleash();
+    watchdog.unleash();
 
     let mut smoothers = Smoothers {
-        temp: Smoother(I16F16!(20.0)),
+        temp: TemperatureSmoother::new(I16F16!(0.0), I16F16!(1.0), I16F16!(4.0)),
         voltage: Smoother(I16F16!(4.0)),
     };
 
@@ -141,6 +141,7 @@ async fn measure_and_update(
     adc: &mut Adc<'_, ADC1>,
     factors: &Factors,
     smoothers: &mut Smoothers,
+    timestep: I16F16,
 ) {
     let v = adc.read(bat_level).await;
     let v = factors.volts_from_raw(v);
@@ -151,8 +152,9 @@ async fn measure_and_update(
     let t = adc.read(tempsense).await;
     let t = factors.temp_from_raw(t);
     smoothers.temp.update(t.0);
+    smoothers.temp.predict(timestep);
 
-    *TEMP.lock().await = Temp(smoothers.temp.0);
+    *TEMP.lock().await = Temp(smoothers.temp.value());
 
     if t.0 > I16F16!(60.0) {
         crate::state::emergency_stop();
@@ -163,7 +165,7 @@ async fn measure_and_update(
     info!(
         "v: {}, t: {}",
         defmt::Display2Format(&smoothers.voltage.0),
-        defmt::Display2Format(&smoothers.temp.0)
+        defmt::Display2Format(&smoothers.temp.value())
     );
 }
 
@@ -187,6 +189,7 @@ async fn measure_while_on(
             &mut adc,
             factors,
             smoothers,
+            I16F16!(0.25)
         )
         .await;
 
@@ -220,6 +223,7 @@ async fn measure_while_off(
                 &mut adc,
                 factors,
                 smoothers,
+                I16F16!(4.0)
             )
             .await;
 
@@ -232,19 +236,70 @@ async fn measure_while_off(
             maitake::time::timeout(core::time::Duration::from_secs(4), POKE_MEASURING.wait()).await;
     }
 }
+#[allow(non_snake_case)]
+struct TemperatureSmoother {
+    u: I16F16,
+    std_dev_a: I16F16,
+    H: nalgebra::SMatrix<I16F16, 1, 2>,
+    R: nalgebra::SMatrix<I16F16, 1, 1>,
+    P: nalgebra::SMatrix<I16F16, 2, 2>,
+    x: nalgebra::SVector<I16F16, 2>,
+}
 
-// #[allow(non_snake_case)]
-// struct TemperatureSmoother {
-//     u: I16F16,
-//     std_dev_a: I16F16,
-//     std_dev_m: I16F16,
-//     A: nalgebra::SMatrix<I16F16, 2, 2>,
-//     B: nalgebra::SMatrix<I16F16, 2, 1>,
-//     H: nalgebra::SMatrix<I16F16, 1, 2>,
-//     Q: nalgebra::SMatrix<I16F16, 2, 2>,
-//     R: nalgebra::SMatrix<I16F16, 1, 1>,
-//     P: nalgebra::SMatrix<I16F16, 2, 2>,
-//     x: nalgebra::SVector<I16F16, 2>,
-// }
+const I: nalgebra::SMatrix<I16F16, 2, 2> =
+    nalgebra::SMatrix::<I16F16, 2, 2>::new(I16F16!(1.0), I16F16!(0.0), I16F16!(0.0), I16F16!(1.0));
 
-// impl TemperatureSmoother {}
+impl TemperatureSmoother {
+    fn new(u: I16F16, std_dev_a: I16F16, std_dev_m: I16F16) -> Self {
+        Self {
+            u,
+            std_dev_a,
+            H: nalgebra::SMatrix::<_, 1, 2>::new(I16F16!(1.0), I16F16!(0.0)),
+            R: nalgebra::SMatrix::<_, 1, 1>::new(std_dev_m * std_dev_m),
+            P: nalgebra::SMatrix::<_, 2, 2>::new(
+                I16F16!(1.0),
+                I16F16!(0.0),
+                I16F16!(0.0),
+                I16F16!(1.0),
+            ),
+            x: nalgebra::SVector::<_, 2>::new(I16F16!(0.0), I16F16!(0.0)),
+        }
+    }
+
+    fn predict(&mut self, dt: I16F16) {
+        let a = nalgebra::SMatrix::<_, 2, 2>::new(I16F16!(1.0), dt, I16F16!(0.0), I16F16!(1.0));
+
+        let dt_2 = dt * dt;
+        let dt_3 = dt_2 * dt;
+        let dt_4 = dt_3 * dt;
+
+        let b = nalgebra::SMatrix::<_, 2, 1>::new(dt_2 * I16F16!(0.5), dt);
+
+        let q = nalgebra::SMatrix::<_, 2, 2>::new(
+            dt_4 * I16F16!(0.25),
+            dt_3 * I16F16!(0.5),
+            dt_3 * I16F16!(0.5),
+            dt_2,
+        ) * self.std_dev_a
+            * self.std_dev_a;
+
+        self.x = (a * self.x) + (b * self.u);
+        self.P = a * self.P * a.transpose() + q;
+    }
+
+    fn update(&mut self, z: I16F16) {
+        let inv = I16F16!(1.0) / (self.H * self.P * self.H.transpose() + self.R).x;
+        let gain = self.P * self.H.transpose() * inv;
+
+        let z = nalgebra::SMatrix::<_, 1, 1>::new(z);
+        let r = z - self.H * self.x;
+
+        self.x = self.x + gain * r;
+
+        self.P = (I - gain * self.H) * self.P;
+    }
+
+    fn value(&self) -> I16F16 {
+        self.x.x
+    }
+}

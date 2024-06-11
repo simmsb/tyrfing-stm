@@ -17,11 +17,7 @@ pub async fn torch_ui_task() {
         let unlocked = crate::state::is_unlocked().await;
 
         if unlocked {
-            let evt = timeout(
-                Duration::from_secs(60 * 3),
-                BUTTON_EVENTS.wait(),
-            )
-            .await;
+            let evt = timeout(Duration::from_secs(60 * 3), BUTTON_EVENTS.wait()).await;
             let Ok(evt) = evt else {
                 blink(1).await;
                 crate::state::set_unlocked(false).await;
@@ -80,7 +76,6 @@ async fn on_strobe() {
     let strobe = async {
         let mut on = true;
         loop {
-
             maitake::time::sleep(period.get().into()).await;
             crate::power::set_level(if on { level.get() } else { 1 });
             crate::power::poke_power_controller();
@@ -163,6 +158,7 @@ async fn on_strobe() {
 async fn on_fadeout() {
     use core::cell::Cell;
 
+    crate::state::set_on(true).await;
     let level = Cell::new(DEFAULT_LEVEL);
     let expiry = Cell::new(Instant::now() + Duration::from_secs(60 * 4));
 
@@ -177,14 +173,8 @@ async fn on_fadeout() {
             let brightness = if time_left > Duration::from_secs(60 * 4) {
                 level.get()
             } else {
-                let remaining = fixed::types::U64F0::from_num(time_left.as_millis())
-                    .inv_lerp::<fixed::types::extra::U64>(
-                        0u32.into(),
-                        (Duration::from_secs(60 * 4).as_millis() as u32).into(),
-                    )
-                    .lerp(0u64.into(), 255u64.into())
-                    .saturating_to_num::<u8>();
-                cichlid::math::scale_u8(level.get(), remaining)
+                ((time_left.as_millis() as u32 * level.get() as u32)
+                    / Duration::from_secs(60 * 4).as_millis() as u32) as u8
             };
 
             crate::power::set_level_gradual(brightness).await;
@@ -247,6 +237,7 @@ async fn on_fadeout() {
     embassy_futures::select::select(fade, control).await;
 
     crate::power::set_level_gradual(0).await;
+    crate::state::set_on(false).await;
 }
 
 async fn on_ramping(level: u8) -> u8 {
@@ -255,12 +246,14 @@ async fn on_ramping(level: u8) -> u8 {
 
     let mut last_hold_release = Instant::now();
 
+    crate::state::set_on(true).await;
     loop {
         crate::power::set_level_gradual(level).await;
 
         match BUTTON_EVENTS.wait().await {
             crate::click::ButtonEvent::Click1 => {
                 crate::power::set_level_gradual(0).await;
+                crate::state::set_on(false).await;
                 return level;
             }
             crate::click::ButtonEvent::Click2 => {

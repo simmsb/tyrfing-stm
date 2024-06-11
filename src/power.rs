@@ -68,8 +68,6 @@ impl<'a> PowerPaths<'a> {
             self.dac.disable();
             self.hdr.set_low();
             self.en.set_low();
-
-            crate::state::set_on(false).await;
         } else {
             if self.en.is_set_low() {
                 self.dac.set(embassy_stm32::dac::Value::Bit8(0));
@@ -78,7 +76,6 @@ impl<'a> PowerPaths<'a> {
                 self.en.set_high();
                 maitake::time::sleep(core::time::Duration::from_millis(8)).await;
 
-                crate::state::set_on(true).await;
                 crate::monitoring::poke_measuring();
                 debug!("Bringing up light");
             }
