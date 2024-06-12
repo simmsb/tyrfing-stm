@@ -4,7 +4,8 @@ use embassy_stm32::{
     gpio::Output,
     peripherals::{EXTI8, PA8, PC15},
 };
-#[derive(PartialEq)]
+
+#[derive(PartialEq, Copy, Clone)]
 pub enum ButtonEvent {
     Click1,
     Click2,

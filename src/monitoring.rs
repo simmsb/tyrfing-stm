@@ -288,8 +288,7 @@ impl TemperatureSmoother {
     }
 
     fn update(&mut self, z: I16F16) {
-        let inv = I16F16!(1.0) / (self.H * self.P * self.H.transpose() + self.R).x;
-        let gain = self.P * self.H.transpose() * inv;
+        let gain = self.P * self.H.transpose() / (self.H * self.P * self.H.transpose() + self.R).x;
 
         let z = nalgebra::SMatrix::<_, 1, 1>::new(z);
         let r = z - self.H * self.x;

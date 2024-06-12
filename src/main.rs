@@ -1,4 +1,6 @@
 #![feature(type_alias_impl_trait)]
+#![feature(impl_trait_in_fn_trait_return)]
+#![feature(async_closure)]
 #![no_std]
 #![no_main]
 
