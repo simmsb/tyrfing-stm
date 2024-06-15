@@ -8,8 +8,8 @@ use embassy_stm32::{
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 use embassy_time::Duration;
-use fixed::types::U16F16;
-use fixed_macro::types::I16F16;
+use fixed::types::U32F32;
+use fixed_macro::types::{I16F16, I32F32};
 
 use crate::monitoring::{Temp, Voltage};
 
@@ -89,16 +89,16 @@ impl<'a> PowerPaths<'a> {
     }
 }
 
-const INSTANT_STOP_TEMP: Temp = Temp(I16F16!(60.0));
-const MAX_TEMP: Temp = Temp(I16F16!(50.0));
+const INSTANT_STOP_TEMP: Temp = Temp(I16F16!(50.0));
+const MAX_TEMP: Temp = Temp(I16F16!(40.0));
 const MIN_VOLTS: Voltage = Voltage(I16F16!(3.0));
 const INSTANT_STOP_VOLTS: Voltage = Voltage(I16F16!(3.0));
 
 async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
     let mut previous_level = 0u8;
 
-    let mut accumulated_over_temp = U16F16::ZERO;
-    let mut accumulated_under_volts = U16F16::ZERO;
+    let mut accumulated_over_temp = U32F32::ZERO;
+    let mut accumulated_under_volts = U32F32::ZERO;
 
     loop {
         let gradual_level = *GRADUAL_LEVEL.lock().await;
@@ -135,7 +135,8 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
 
         let temp_diff = temp.0 - MAX_TEMP.0;
 
-        accumulated_over_temp = accumulated_over_temp.saturating_add_signed(temp_diff);
+        accumulated_over_temp =
+            accumulated_over_temp.saturating_add_signed(temp_diff.saturating_to_num());
 
         trace!(
             "Accumulated over temp: {}",
@@ -144,9 +145,9 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
 
         accumulated_under_volts =
             accumulated_under_volts.saturating_add_signed(if volts < MIN_VOLTS {
-                I16F16!(1.0)
+                I32F32!(1.0)
             } else {
-                I16F16!(-1.0)
+                I32F32!(-1.0)
             });
 
         trace!(
@@ -154,11 +155,12 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
             defmt::Display2Format(&accumulated_under_volts)
         );
 
+        // TODO: model this and tune the values correctly
         const TICKS_PER_SEC: u64 = 100;
-        let power_decrease = accumulated_under_volts
-            .saturating_add(accumulated_over_temp / U16F16::from_num(64 * TICKS_PER_SEC * 2));
+        let power_decrease = (accumulated_under_volts / U32F32::from_num(TICKS_PER_SEC))
+            .saturating_add(accumulated_over_temp / U32F32::from_num(TICKS_PER_SEC));
 
-        actual_level = actual_level.saturating_sub(power_decrease.int().to_num());
+        actual_level = actual_level.saturating_sub(power_decrease.int().saturating_to_num());
 
         if actual_level != previous_level {
             previous_level = actual_level;

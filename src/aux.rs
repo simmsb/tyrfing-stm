@@ -11,10 +11,10 @@ use embassy_stm32::{
     },
     Peripheral as _,
 };
-use fixed::types::I16F16;
-use fixed_macro::types::I16F16;
+use fixed::types::{extra::U16, I16F16};
+use fixed_macro::types::{I16F16, U16F16};
 
-use crate::monitoring::Voltage;
+use crate::monitoring::{Temp, Voltage};
 
 #[derive(Clone, Copy)]
 struct Rgb1Bit {
@@ -136,6 +136,21 @@ fn volts_to_rgb(volts: Voltage) -> ColorRGB {
     hue_to_rgb(hue)
 }
 
+fn temp_to_rgb(temp: Temp) -> ColorRGB {
+    // red
+    let min_hue = 0u8;
+    // magenta
+    let max_hue = 212u8;
+
+    let level = temp.0.inv_lerp::<U16>(I16F16!(0.0), I16F16!(40.0));
+
+    let hue = level
+        .lerp(I16F16::from_num(min_hue), I16F16::from_num(max_hue))
+        .to_num();
+
+    hue_to_rgb(hue)
+}
+
 fn volts_to_1bit_rgb(volts: Voltage) -> Rgb1Bit {
     if volts > Voltage(I16F16!(4.1)) {
         Rgb1Bit::new(true, false, true)
@@ -161,6 +176,9 @@ async fn voltage_high_aux<'a>(leds: &mut AuxPwm<'a>, prior: ColorRGB) -> ColorRG
     loop {
         let volts = *crate::monitoring::VOLTAGE.lock().await;
         let rgb = volts_to_rgb(volts);
+
+        // let temp= *crate::monitoring::TEMP.lock().await;
+        // let rgb = temp_to_rgb(temp);
 
         if crate::state::is_on().await || !crate::state::is_unlocked().await {
             return rgb;
