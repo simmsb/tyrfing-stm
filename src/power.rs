@@ -85,7 +85,7 @@ impl<'a> PowerPaths<'a> {
                 self.dac.enable();
                 self.set_hdr(false);
                 self.opamp_en.set_high();
-                maitake::time::sleep(core::time::Duration::from_millis(8)).await;
+                maitake::time::sleep(core::time::Duration::from_millis(40)).await;
                 self.boost_en.set_high();
                 crate::monitoring::poke_measuring();
                 debug!("Bringing up light");
@@ -105,6 +105,18 @@ const MAX_TEMP: Temp = Temp(I16F16!(40.0));
 const MIN_VOLTS: Voltage = Voltage(I16F16!(3.0));
 const INSTANT_STOP_VOLTS: Voltage = Voltage(I16F16!(3.0));
 
+fn delta(desired_level: u8, gradual_level: u8) -> u8 {
+    let abs_diff = desired_level.abs_diff(gradual_level);
+
+    if abs_diff < 10 {
+        1
+    } else if abs_diff < 30 {
+        3
+    } else {
+        abs_diff / 8
+    }
+}
+
 async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
     let mut previous_level = 0u8;
 
@@ -115,11 +127,7 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
         let gradual_level = *GRADUAL_LEVEL.lock().await;
         let desired_level = *DESIRED_LEVEL.lock().await;
 
-        let delta = if desired_level.abs_diff(gradual_level) > 50 {
-            3
-        } else {
-            1
-        };
+        let delta = delta(desired_level, gradual_level);
 
         let desired_level = if desired_level < gradual_level {
             desired_level + delta

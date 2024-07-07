@@ -17,7 +17,9 @@ impl PowerLevel {
         // taken from boost.nbt, this is R_SENSE_HDR / R_SENSE_MAIN
         let hdr_factor = 412.0;
         let (scale, offset) = if self.hdr {
-            (1.0, 0.0)
+            // we offset the high end configs by one dac step so that we don't
+            // pick high end configs for an output level of zero
+            (1.0, 1.0 / hdr_factor)
         } else {
             (1.0 / hdr_factor, 0.0)
         };

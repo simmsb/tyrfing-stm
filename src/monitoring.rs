@@ -210,28 +210,27 @@ async fn measure_while_off(
     smoothers: &mut Smoothers,
 ) {
     loop {
-        // this scope is important, we must drop the adc before we sleep
-        {
-            let mut adc = Adc::new(p.reborrow(), Irqs);
-            adc.set_sample_time(SampleTime::CYCLES160_5);
+        let mut adc = Adc::new(p.reborrow(), Irqs);
+        adc.set_sample_time(SampleTime::CYCLES160_5);
 
-            let mut tempsense = adc.enable_temperature();
+        let mut tempsense = adc.enable_temperature();
 
-            measure_and_update(
-                watchdog,
-                bat_level,
-                &mut tempsense,
-                &mut adc,
-                factors,
-                smoothers,
-                I16F16!(4.0),
-            )
-            .await;
+        measure_and_update(
+            watchdog,
+            bat_level,
+            &mut tempsense,
+            &mut adc,
+            factors,
+            smoothers,
+            I16F16!(4.0),
+        )
+        .await;
 
-            if crate::state::is_on().await {
-                return;
-            }
+        if crate::state::is_on().await {
+            return;
         }
+
+        drop(adc);
 
         let _ =
             maitake::time::timeout(core::time::Duration::from_secs(4), POKE_MEASURING.wait()).await;

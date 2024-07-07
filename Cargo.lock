@@ -238,7 +238,7 @@ dependencies = [
 [[package]]
 name = "embassy-embedded-hal"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "defmt",
  "embassy-futures 0.1.1 (git+https://github.com/simmsb/embassy?branch=main)",
@@ -255,7 +255,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor"
 version = "0.5.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "cortex-m",
  "critical-section",
@@ -269,7 +269,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor-macros"
 version = "0.4.1"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -286,12 +286,12 @@ checksum = "1f878075b9794c1e4ac788c95b728f26aa6366d32eeb10c7051389f898f7d067"
 [[package]]
 name = "embassy-futures"
 version = "0.1.1"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 
 [[package]]
 name = "embassy-hal-internal"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "cortex-m",
  "critical-section",
@@ -302,7 +302,7 @@ dependencies = [
 [[package]]
 name = "embassy-net-driver"
 version = "0.2.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "defmt",
 ]
@@ -310,7 +310,7 @@ dependencies = [
 [[package]]
 name = "embassy-stm32"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "bit_field",
  "bitflags 2.6.0",
@@ -354,8 +354,8 @@ dependencies = [
 
 [[package]]
 name = "embassy-sync"
-version = "0.5.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+version = "0.6.0"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -367,8 +367,8 @@ dependencies = [
 
 [[package]]
 name = "embassy-time"
-version = "0.3.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+version = "0.3.1"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -386,7 +386,7 @@ dependencies = [
 [[package]]
 name = "embassy-time-driver"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "document-features",
 ]
@@ -394,12 +394,12 @@ dependencies = [
 [[package]]
 name = "embassy-time-queue-driver"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 
 [[package]]
 name = "embassy-usb-driver"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "defmt",
 ]
@@ -407,7 +407,7 @@ dependencies = [
 [[package]]
 name = "embassy-usb-synopsys-otg"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/embassy?branch=main#877d40934fc13bcfda274989ebcde0e9ed2b90eb"
+source = "git+https://github.com/simmsb/embassy?branch=main#0f4c7344a9443dbebabeeb385aecc83bbb63fdab"
 dependencies = [
  "critical-section",
  "embassy-sync",
@@ -714,9 +714,9 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.32.6"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5c17de023a86f59ed79891b2e5d5a94c705dbe904a5b5c9c952ea6221b03e4"
+checksum = "3c4b5f057b303842cf3262c27e465f4c303572e7f6b0648f60e16248ac3397f4"
 dependencies = [
  "approx",
  "num-complex",
@@ -1008,9 +1008,9 @@ dependencies = [
 
 [[package]]
 name = "simba"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061507c94fc6ab4ba1c9a0305018408e312e17c041eb63bef8aa726fa33aceae"
+checksum = "b3a386a501cd104797982c15ae17aafe8b9261315b5d07e3ec803f2ea26be0fa"
 dependencies = [
  "approx",
  "num-complex",
@@ -1063,7 +1063,7 @@ dependencies = [
 [[package]]
 name = "stm32-metapac"
 version = "15.0.0"
-source = "git+https://github.com/embassy-rs/stm32-data-generated?tag=stm32-data-f1297385e91f061fcb6134bb25f51e12d8abff93#acfef07196084706a9621a434d927229b616951f"
+source = "git+https://github.com/embassy-rs/stm32-data-generated?tag=stm32-data-e0cfd165fd8fffaa0df66a35eeca83b228496645#bf02c35d063e1823a156468497b448ae3350a255"
 dependencies = [
  "cortex-m",
  "cortex-m-rt",
