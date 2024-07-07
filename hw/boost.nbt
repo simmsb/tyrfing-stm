@@ -65,7 +65,7 @@ let uvlo_r_bot = derive_pot_bot(uvlo_r_top, uvlo_v_in_on - uvlo_v_in_hys, uvlo_v
 print("R_UVLO_TOP: {uvlo_r_top}")
 print("R_UVLO_BOTTOM: {uvlo_r_bot}")
 
-let vcc = 2.5V
+let vcc = 2.8V
 let opamp_v_min = 70uV
 let opamp_v_max = vcc - opamp_v_min
 let opamp_v_input_offset_max = 15e-6 V
@@ -127,7 +127,7 @@ let hdr_i_out_max = (10 * main_i_out_min)
 # let hdr_i_out_max = (main_i_out_min)
 
 let sense_r_hdr_ideal = vref_max / hdr_i_out_max -> ohms
-let sense_r_hdr = 4.7 ohms
+let sense_r_hdr = 4.12 ohms
 
 print("R_SENSE_MAIN: {sense_r_main}")
 print("R_SENSE_HDR: {sense_r_hdr_ideal}")

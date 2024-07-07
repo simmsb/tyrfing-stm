@@ -12,7 +12,7 @@ use embassy_stm32::{
     Peripheral as _,
 };
 use fixed::types::{extra::U16, I16F16};
-use fixed_macro::types::{I16F16, U16F16};
+use fixed_macro::types::I16F16;
 
 use crate::monitoring::{Temp, Voltage};
 
@@ -136,6 +136,7 @@ fn volts_to_rgb(volts: Voltage) -> ColorRGB {
     hue_to_rgb(hue)
 }
 
+#[allow(unused)]
 fn temp_to_rgb(temp: Temp) -> ColorRGB {
     // red
     let min_hue = 0u8;

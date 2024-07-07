@@ -6237,71 +6237,6 @@
 	)
 	(symbol
 		(lib_id "Connector_Generic:Conn_01x01")
-		(at 266.7 217.17 180)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "2417c950-01a2-49aa-8695-a4226688e2e9")
-		(property "Reference" "J13"
-			(at 266.7 210.82 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "Button_GND"
-			(at 266.7 213.36 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 266.7 217.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 266.7 217.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 266.7 217.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "d9312280-68e7-4c15-baf0-b2cd325ee4cd")
-		)
-		(instances
-			(project "Driver"
-				(path "/7fa7dcf1-f7f2-431d-b0e2-843364aa27ee"
-					(reference "J13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector_Generic:Conn_01x01")
 		(at 353.06 228.6 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -6923,7 +6858,7 @@
 				)
 			)
 		)
-		(property "Value" "Button LED GND"
+		(property "Value" "Wire GND"
 			(at 266.7 223.52 0)
 			(effects
 				(font
@@ -6931,7 +6866,7 @@
 				)
 			)
 		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm_copy"
 			(at 266.7 227.33 0)
 			(effects
 				(font
@@ -8410,7 +8345,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "7m - R_SENSE_MAIN"
+		(property "Value" "10m - R_SENSE_MAIN"
 			(at 200.66 278.384 90)
 			(effects
 				(font
@@ -9569,7 +9504,7 @@
 				)
 			)
 		)
-		(property "Value" "450k - R_FB_C"
+		(property "Value" "434k - R_FB_C"
 			(at 185.42 193.04 90)
 			(effects
 				(font

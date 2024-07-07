@@ -14,12 +14,12 @@ struct PowerLevel {
 impl PowerLevel {
     // output of this level, 0..1
     fn output(&self) -> f32 {
-        let hdr_factor = 470.0;
+        // taken from boost.nbt, this is R_SENSE_HDR / R_SENSE_MAIN
+        let hdr_factor = 412.0;
         let (scale, offset) = if self.hdr {
-            (1.0, 1.015 / hdr_factor)
+            (1.0, 0.0)
         } else {
             (1.0 / hdr_factor, 0.0)
-            // 1 / 3413.33
         };
 
         scale * (self.dac as f32 / 4096.0) + offset

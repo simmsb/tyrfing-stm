@@ -3,7 +3,7 @@ use embassy_stm32::{
     dac::{Dac, DacCh1, Value},
     dma::NoDma,
     gpio::Output,
-    peripherals::{DAC1, PA2, PA4, PA5, PB5},
+    peripherals::{DAC1, PA5},
     Peripheral,
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
@@ -11,7 +11,10 @@ use embassy_time::Duration;
 use fixed::types::U32F32;
 use fixed_macro::types::{I16F16, I32F32};
 
-use crate::monitoring::{Temp, Voltage};
+use crate::{
+    monitoring::{Temp, Voltage},
+    pins,
+};
 
 static DESIRED_LEVEL: embassy_sync::mutex::Mutex<ThreadModeRawMutex, u8> = Mutex::new(0);
 static GRADUAL_LEVEL: embassy_sync::mutex::Mutex<ThreadModeRawMutex, u8> = Mutex::new(0);
@@ -57,25 +60,33 @@ pub async fn set_level(level: u8) {
 struct PowerPaths<'a> {
     dac: DacCh1<'a, DAC1>,
     hdr: Output<'a>,
-    en: Output<'a>,
+    opamp_en: Output<'a>,
+    boost_en: Output<'a>,
+    shunt_select: Output<'a>,
 }
 
 impl<'a> PowerPaths<'a> {
+    fn set_hdr(&mut self, high_range: bool) {
+        self.hdr.set_level(high_range.into());
+        self.shunt_select.set_level(high_range.into());
+    }
+
     async fn set(&mut self, level: u8) {
         if level == 0 {
             debug!("Setting light level to {}", level);
             self.dac.set(embassy_stm32::dac::Value::Bit8(0));
             self.dac.disable();
-            self.hdr.set_low();
-            self.en.set_low();
+            self.set_hdr(false);
+            self.opamp_en.set_low();
+            self.boost_en.set_low();
         } else {
-            if self.en.is_set_low() {
+            if self.boost_en.is_set_low() {
                 self.dac.set(embassy_stm32::dac::Value::Bit8(0));
                 self.dac.enable();
-                self.hdr.set_low();
-                self.en.set_high();
+                self.set_hdr(false);
+                self.opamp_en.set_high();
                 maitake::time::sleep(core::time::Duration::from_millis(8)).await;
-
+                self.boost_en.set_high();
                 crate::monitoring::poke_measuring();
                 debug!("Bringing up light");
             }
@@ -84,7 +95,7 @@ impl<'a> PowerPaths<'a> {
             debug!("hdr: {}, dac: {}", config.hdr, config.dac);
             self.dac
                 .set(embassy_stm32::dac::Value::Bit12Right(config.dac));
-            self.hdr.set_level(config.hdr.into());
+            self.set_hdr(config.hdr.into());
         }
     }
 }
@@ -177,9 +188,19 @@ async fn handle_on_state<'a>(mut paths: PowerPaths<'a>) {
 }
 
 // #[embassy_executor::task]
-pub async fn power_task(hdr: PA2, en: PB5, dac: DAC1, dac_out: PA4, pa5: PA5) {
+pub async fn power_task(
+    hdr: pins::hdr!(),
+    opamp_en: pins::opamp_en!(),
+    boost_en: pins::boost_en!(),
+    shunt_select: pins::shunt_select!(),
+    dac: DAC1,
+    dac_out: pins::dac!(),
+    pa5: PA5,
+) {
     let mut hdr = hdr.into_ref();
-    let mut en = en.into_ref();
+    let mut opamp_en = opamp_en.into_ref();
+    let mut boost_en = boost_en.into_ref();
+    let mut shunt_select = shunt_select.into_ref();
     let mut dac = dac.into_ref();
     let mut dac_out = dac_out.into_ref();
     let mut pa5 = pa5.into_ref();
@@ -209,8 +230,18 @@ pub async fn power_task(hdr: PA2, en: PB5, dac: DAC1, dac_out: PA4, pa5: PA5) {
                 embassy_stm32::gpio::Level::Low,
                 embassy_stm32::gpio::Speed::Low,
             ),
-            en: Output::new(
-                en.reborrow(),
+            opamp_en: Output::new(
+                opamp_en.reborrow(),
+                embassy_stm32::gpio::Level::Low,
+                embassy_stm32::gpio::Speed::Low,
+            ),
+            boost_en: Output::new(
+                boost_en.reborrow(),
+                embassy_stm32::gpio::Level::Low,
+                embassy_stm32::gpio::Speed::Low,
+            ),
+            shunt_select: Output::new(
+                shunt_select.reborrow(),
                 embassy_stm32::gpio::Level::Low,
                 embassy_stm32::gpio::Speed::Low,
             ),

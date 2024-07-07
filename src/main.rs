@@ -1,4 +1,5 @@
 #![feature(type_alias_impl_trait)]
+#![feature(impl_trait_in_assoc_type)]
 #![feature(impl_trait_in_fn_trait_return)]
 #![feature(async_closure)]
 #![no_std]
@@ -18,6 +19,7 @@ mod aux;
 mod battery_level;
 mod click;
 mod monitoring;
+mod pins;
 mod power;
 mod power_curve;
 mod state;
@@ -29,23 +31,6 @@ mod executor;
 static CNT: AtomicUsize = AtomicUsize::new(0);
 
 defmt::timestamp! {"{}", CNT.fetch_add(1, portable_atomic::Ordering::Relaxed) }
-
-//  _____________________________
-// /\                            \
-// \_| PINS                      |
-//   | ----                      |
-//   | PA0: Battery sense        |
-//   | PA2: HDR                  |
-//   | PA3: EN (dev)             |
-//   | PA4: DAC out              |
-//   | PA6: Red Aux   (c1: tim3) |
-//   | PA7: Green Aux (c2: tim3) |
-//   | PB0: Blue Aux  (c3: tim3) |
-//   | PC15: Button LED          |
-//   | PA8: Button               |
-//   | PB5: EN (prod)            |
-//   |   ________________________|_
-//    \_/__________________________/
 
 #[cfg(feature = "use_maitake_executor")]
 mod maitake_stuff {
@@ -114,11 +99,31 @@ fn main() -> ! {
     static RTC: StaticCell<Rtc> = StaticCell::new();
     let rtc = RTC.init(rtc);
 
-    spawn!(monitoring::monitoring_task(p.PA0, p.ADC1, p.IWDG));
-    // spawn!(power::power_task(p.PA2, p.PA3, p.DAC1, p.PA4, p.PA5));
-    spawn!(power::power_task(p.PA2, p.PB5, p.DAC1, p.PA4, p.PA5));
-    spawn!(aux::aux_task(p.TIM3, p.PA6, p.PA7, p.PB0));
-    spawn!(click::debouncer_task(p.PA8, p.EXTI8, p.PC15));
+    spawn!(monitoring::monitoring_task(
+        pins::take_battery_sense!(p),
+        p.ADC1,
+        p.IWDG
+    ));
+    spawn!(power::power_task(
+        pins::take_hdr!(p),
+        pins::take_opamp_en!(p),
+        pins::take_boost_en!(p),
+        pins::take_shunt_select!(p),
+        p.DAC1,
+        pins::take_dac!(p),
+        p.PA5
+    ));
+    spawn!(aux::aux_task(
+        p.TIM3,
+        pins::take_aux_r!(p),
+        pins::take_aux_g!(p),
+        pins::take_aux_b!(p)
+    ));
+    spawn!(click::debouncer_task(
+        pins::take_button!(p),
+        p.EXTI8,
+        pins::take_button_led!(p)
+    ));
     spawn!(click::event_generator_task());
     spawn!(ui::torch_ui_task());
 

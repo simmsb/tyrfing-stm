@@ -1,3 +1,6 @@
 **/*-backups/
+**/*-bak
+**/*.lck
+**/bom/
 fp-info-cache
 *freerouting.dsn
