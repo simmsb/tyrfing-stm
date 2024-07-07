@@ -32,8 +32,8 @@ const VREF_CAL: *const u16 = 0x1FF8_0078 as _;
 const TS_CAL1: *const u16 = 0x1FF8_007A as _;
 const TS_CAL2: *const u16 = 0x1FF8_007E as _;
 
-// the battery will measure 2.4v on the ADC when at the peak of 4.2v
-const BATTERY_VOLTAGE_FACTOR: I16F16 = I16F16!(4.2).unwrapped_div(I16F16!(2.4));
+// the battery will measure 2.7v on the ADC when at the peak of 4.2v
+const BATTERY_VOLTAGE_FACTOR: I16F16 = I16F16!(4.2).unwrapped_div(I16F16!(2.7));
 
 struct Factors {
     vref_scale: I16F16,
