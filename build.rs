@@ -19,7 +19,7 @@ impl PowerLevel {
         let (scale, offset) = if self.hdr {
             // we offset the high end configs by one dac step so that we don't
             // pick high end configs for an output level of zero
-            (1.0, 1.0 / hdr_factor)
+            (1.0, 0.0)
         } else {
             (1.0 / hdr_factor, 0.0)
         };
@@ -33,6 +33,8 @@ fn possible_levels() -> Vec<PowerLevel> {
         .into_iter()
         .flat_map(|hdr| (0..4096).map(move |dac| PowerLevel { hdr, dac }))
         .filter(|l| l.hdr || l.dac != 0)
+        .filter(|l| !l.hdr || l.dac > 10) // clip off the low end of the high gear
+        .filter(|l| l.hdr || l.dac < 3000) // clip off the upper end of the low gear
         .collect::<Vec<_>>();
 
     levels
@@ -52,7 +54,7 @@ fn main() {
             .min_by(|a, b| f32::total_cmp(&(a.output() - l).abs(), &(b.output() - l).abs()))
             .unwrap();
 
-        // println!("cargo:warning=For {l:0.3}: hdr: {hdr}, dac: {dac}");
+        println!("cargo:warning=For {l:0.3}: hdr: {hdr}, dac: {dac}");
 
         quote! {
             PowerLevel {

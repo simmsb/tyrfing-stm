@@ -1,6 +1,8 @@
 use embassy_stm32::gpio::Output;
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 
+use crate::aux::poke_aux;
+
 static ON: Mutex<ThreadModeRawMutex, bool> = Mutex::new(false);
 
 pub async fn is_on() -> bool {
@@ -19,6 +21,7 @@ pub async fn is_unlocked() -> bool {
 
 pub async fn set_unlocked(unlocked: bool) {
     *UNLOCKED.lock().await = unlocked;
+    poke_aux();
 }
 
 pub fn emergency_stop() {

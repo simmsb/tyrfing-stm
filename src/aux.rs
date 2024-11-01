@@ -11,10 +11,18 @@ use embassy_stm32::{
     },
     Peripheral as _,
 };
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use fixed::types::{extra::U16, I16F16};
 use fixed_macro::types::I16F16;
 
 use crate::monitoring::{Temp, Voltage};
+
+static POKE_AUX: embassy_sync::signal::Signal<ThreadModeRawMutex, ()> =
+    embassy_sync::signal::Signal::new();
+
+pub fn poke_aux() {
+    POKE_AUX.signal(());
+}
 
 #[derive(Clone, Copy)]
 struct Rgb1Bit {
@@ -210,7 +218,11 @@ async fn voltage_low_aux<'a>(leds: &mut AuxLow<'a>) -> ColorRGB {
             return rgb.to_colorrgb();
         }
 
-        maitake::time::sleep(core::time::Duration::from_secs(4)).await;
+        embassy_futures::select::select(
+            maitake::time::sleep(core::time::Duration::from_secs(4)),
+            POKE_AUX.wait(),
+        )
+        .await;
     }
 }
 

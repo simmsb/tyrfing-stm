@@ -213,48 +213,50 @@ pub async fn power_task(
     let mut dac_out = dac_out.into_ref();
     let mut pa5 = pa5.into_ref();
     loop {
-        POKE_POWER_CONTROLLER.wait().await;
-
         info!("Power task coming online");
 
-        let (mut dac_ch1, mut dac_ch2) = Dac::new(
-            dac.reborrow(),
-            NoDma,
-            NoDma,
-            dac_out.reborrow(),
-            pa5.reborrow(),
-        )
-        .split();
-        dac_ch2.set(Value::Bit8(0));
-        dac_ch1.set(Value::Bit8(0));
-        dac_ch2.set_enable(false);
-        dac_ch1.set_enable(false);
-        dac_ch1.set_output_buffer(false);
+        {
+            let (mut dac_ch1, mut dac_ch2) = Dac::new(
+                dac.reborrow(),
+                NoDma,
+                NoDma,
+                dac_out.reborrow(),
+                pa5.reborrow(),
+            )
+            .split();
+            dac_ch2.set(Value::Bit8(0));
+            dac_ch1.set(Value::Bit8(0));
+            dac_ch2.set_enable(false);
+            dac_ch1.set_enable(false);
+            dac_ch1.set_output_buffer(false);
 
-        let paths = PowerPaths {
-            dac: dac_ch1,
-            hdr: Output::new(
-                hdr.reborrow(),
-                embassy_stm32::gpio::Level::Low,
-                embassy_stm32::gpio::Speed::Low,
-            ),
-            opamp_en: Output::new(
-                opamp_en.reborrow(),
-                embassy_stm32::gpio::Level::Low,
-                embassy_stm32::gpio::Speed::Low,
-            ),
-            boost_en: Output::new(
-                boost_en.reborrow(),
-                embassy_stm32::gpio::Level::Low,
-                embassy_stm32::gpio::Speed::Low,
-            ),
-            shunt_select: Output::new(
-                shunt_select.reborrow(),
-                embassy_stm32::gpio::Level::Low,
-                embassy_stm32::gpio::Speed::Low,
-            ),
-        };
+            let paths = PowerPaths {
+                dac: dac_ch1,
+                hdr: Output::new(
+                    hdr.reborrow(),
+                    embassy_stm32::gpio::Level::Low,
+                    embassy_stm32::gpio::Speed::Low,
+                ),
+                opamp_en: Output::new(
+                    opamp_en.reborrow(),
+                    embassy_stm32::gpio::Level::Low,
+                    embassy_stm32::gpio::Speed::Low,
+                ),
+                boost_en: Output::new(
+                    boost_en.reborrow(),
+                    embassy_stm32::gpio::Level::Low,
+                    embassy_stm32::gpio::Speed::Low,
+                ),
+                shunt_select: Output::new(
+                    shunt_select.reborrow(),
+                    embassy_stm32::gpio::Level::Low,
+                    embassy_stm32::gpio::Speed::Low,
+                ),
+            };
 
-        handle_on_state(paths).await;
+            handle_on_state(paths).await;
+        }
+
+        POKE_POWER_CONTROLLER.wait().await;
     }
 }

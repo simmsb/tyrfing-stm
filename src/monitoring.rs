@@ -21,8 +21,8 @@ pub struct Temp(pub I16F16);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Voltage(pub I16F16);
 
-pub static TEMP: Mutex<ThreadModeRawMutex, Temp> = Mutex::new(Temp(I16F16!(0)));
-pub static VOLTAGE: Mutex<ThreadModeRawMutex, Voltage> = Mutex::new(Voltage(I16F16!(0)));
+pub static TEMP: Mutex<ThreadModeRawMutex, Temp> = Mutex::new(Temp(I16F16!(20)));
+pub static VOLTAGE: Mutex<ThreadModeRawMutex, Voltage> = Mutex::new(Voltage(I16F16!(4.2)));
 
 bind_interrupts!(struct Irqs {
     ADC1_COMP => adc::InterruptHandler<ADC1>;
@@ -107,7 +107,7 @@ pub async fn monitoring_task(mut bat_level: PA0, adc: ADC1, wd: IWDG) {
 
     let mut smoothers = Smoothers {
         temp: TemperatureSmoother::new(I16F16!(0.0), I16F16!(1.0), I16F16!(4.0)),
-        voltage: Smoother(I16F16!(4.0)),
+        voltage: Smoother(I16F16!(4.2)),
     };
 
     let factors = Factors::calculate(adc.reborrow()).await;
